@@ -5,18 +5,18 @@ Shader "UI/Reflection"
 	Properties
 	{
 		[PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
-		_WaveTex("Wave", 2D) = "white" {}
-		_Offset("Vertex Offset", vector) = (0, 0, 0, 0)
-		_Color ("Tint", Color) = (1,1,1,1)
-		_Indentity ("Indentity", float) = 1.0
-		_WaveOffset ("WaveOffset", float) = 0.0
-		_Speed ("WaveSpeed", float) = 1.0
-		_AlphaFadeIn ("AlphaFadeIn", float) = 0.0
-		_AlphaFadeOut ("AlphaFadeOut", float) = 1.0
-		_TwistFadeIn ("TwistFadeIn", float) = 1.0
-		_TwistFadeOut ("TwistFadeOut", float) = 1.0
-		_TwistFadeInIndentity ("TwistFadeInIndentity", float) = 1.0
-		_TwistFadeOutIndentity ("TwistFadeOutIndentity", float) = 1.0
+		_WaveNoise("Noise", 2D) = "white" {}  //用于扭曲的噪声纹理
+		_Offset("Vertex Offset", vector) = (0, 0, 0, 0)  //顶点偏移
+		_Color ("Tint", Color) = (1,1,1,1)   
+		_Distort("Distort", float) = 1.0    //扭曲强度
+		_SampOffset ("SampleOffset", float) = 0.0   //噪声纹理采样偏移
+		_Speed ("WaveSpeed", float) = 1.0   //水波速度
+		_AlphaFadeIn ("AlphaFadeIn", float) = 0.0    //透明度淡入
+		_AlphaFadeOut ("AlphaFadeOut", float) = 1.0   //透明度淡出
+		_DistortFadeIn ("DistortFadeIn", float) = 1.0    //扭曲淡入
+		_DistortFadeOut ("DistortFadeOut", float) = 1.0    //扭曲淡出
+		_DistortFadeInStrength ("DistortFadeInStrength", float) = 1.0   //扭曲淡入时强度
+		_DistortFadeOutStrength("DistortFadeOutStrength ", float) = 1.0   //扭曲淡出时强度
 		
 		_StencilComp ("Stencil Comparison", Float) = 8
 		_Stencil ("Stencil ID", Float) = 0
@@ -155,14 +155,14 @@ Shader "UI/Reflection"
 
 			float4 _Offset;
 			half _Speed;
-			half _Indentity;
-			half _WaveOffset;
+			half _Distort;
+			half _SampOffset;
 			float _AlphaFadeIn;
 			float _AlphaFadeOut;
-			half _TwistFadeIn;
-			half _TwistFadeOut;
-			fixed _TwistFadeInIndentity;
-			fixed _TwistFadeOutIndentity;
+			half _DistortFadeIn;
+			half _DistortFadeOut;
+			fixed _DistortFadeInStrength;
+			fixed _DistortFadeOutStrength;
 
 			v2f vert(appdata_t IN)
 			{
@@ -180,22 +180,22 @@ Shader "UI/Reflection"
 			}
 
 			sampler2D _MainTex;
-			sampler2D _WaveTex;
+			sampler2D _WaveNoise;
 
 			fixed4 frag(v2f IN) : SV_Target
 			{
-				fixed fadeT = fadeT = saturate((_TwistFadeOut - IN.texcoord.y) / (_TwistFadeOut - _TwistFadeIn));
-				fixed2 tuv = (IN.texcoord - fixed2(0.5, 0)) * fixed2(lerp(_TwistFadeOutIndentity, _TwistFadeInIndentity, fadeT), 1) + fixed2(0.5, 0);
+				fixed fadeD = saturate((_DistortFadeOut - IN.texcoord.y) / (_DistortFadeOut - _DistortFadeIn));
+				fixed2 duv = (IN.texcoord - fixed2(0.5, 0)) * fixed2(lerp(_DistortFadeOutStrength, _DistortFadeInStrength, fadeD), 1) + fixed2(0.5, 0);
 
-				fixed waveL = tex2D(_WaveTex, tuv + fixed2(_WaveOffset, _Time.y * _Speed)).r;
-				fixed waveR = tex2D(_WaveTex, tuv + fixed2(-_WaveOffset, _Time.y * _Speed)).r;
-				fixed waveU = tex2D(_WaveTex, tuv + fixed2(0, _Time.y * _Speed + _WaveOffset)).r;
-				fixed waveD = tex2D(_WaveTex, tuv + fixed2(0, _Time.y * _Speed - _WaveOffset)).r;
-				fixed2 ruv = fixed2(IN.texcoord.x, 1 - IN.texcoord.y) + fixed2(waveL - waveR, waveU - waveD) * _Indentity;
+				fixed waveL = tex2D(_WaveNoise, duv + fixed2(_SampOffset, _Time.y * _Speed)).r;
+				fixed waveR = tex2D(_WaveNoise, duv + fixed2(-_SampOffset, _Time.y * _Speed)).r;
+				fixed waveU = tex2D(_WaveNoise, duv + fixed2(0, _Time.y * _Speed + _SampOffset)).r;
+				fixed waveD = tex2D(_WaveNoise, duv + fixed2(0, _Time.y * _Speed - _SampOffset)).r;
+				fixed2 uv = fixed2(IN.texcoord.x, 1 - IN.texcoord.y) + fixed2(waveL - waveR, waveU - waveD) * _Distort;
 
-				half4 color = (tex2D(_MainTex, ruv) + _TextureSampleAdd) * IN.color;
+				half4 color = (tex2D(_MainTex, uv) + _TextureSampleAdd) * IN.color;
 
-				fixed fadeA = saturate((_AlphaFadeOut - ruv.y) / (_AlphaFadeOut - _AlphaFadeIn));
+				fixed fadeA = saturate((_AlphaFadeOut - uv.y) / (_AlphaFadeOut - _AlphaFadeIn));
 
 				color.a *= UnityGet2DClipping(IN.worldPosition.xy, _ClipRect)*fadeA;
 
